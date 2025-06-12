@@ -1,0 +1,107 @@
+package main
+
+import (
+	"fmt"
+	"math"
+
+	"gonum.org/v1/plot"
+	"gonum.org/v1/plot/plotter"
+	"gonum.org/v1/plot/vg"
+)
+
+// Function to generate the L-system string
+func generateLSystem(axiom string, rules map[string]string, iterations int) string {
+	current := axiom
+	for i := 0; i < iterations; i++ {
+		next := ""
+		for _, char := range current {
+			if replacement, exists := rules[string(char)]; exists {
+				next += replacement
+			} else {
+				next += string(char)
+			}
+		}
+		current = next
+	}
+	return current
+}
+
+// Function to draw the L-system and return the points as a continuous path
+func drawLSystem(instructions string, angle float64) plotter.XYs {
+	var stack []State
+	var points plotter.XYs
+	x, y := 0.0, 0.0
+	direction := 90.0 // Start facing "up"
+
+	points = append(points, plotter.XY{X: x, Y: y}) // Starting point
+
+	for _, command := range instructions {
+		switch command {
+		case 'A', 'B':
+			// Move forward and store the new point
+			x += math.Cos(direction*math.Pi/180) * 5
+			y += math.Sin(direction*math.Pi/180) * 5
+			points = append(points, plotter.XY{X: x, Y: y})
+
+		case '+':
+			// Turn right
+			direction += angle
+
+		case '-':
+			// Turn left
+			direction -= angle
+
+		case '[':
+			// Save current state (direction and position)
+			stack = append(stack, State{direction, x, y})
+
+		case ']':
+			// Restore previous state (direction and position)
+			lastState := stack[len(stack)-1]
+			stack = stack[:len(stack)-1]
+			direction = lastState.direction
+			x, y = lastState.x, lastState.y
+			points = append(points, plotter.XY{X: x, Y: y}) // Append restored position
+		}
+	}
+	return points
+}
+
+// State struct to store the direction and position
+type State struct {
+	direction float64
+	x, y      float64
+}
+
+// Main function
+func main() {
+	// L-system parameters
+	axiom := "A"
+	rules := map[string]string{
+		"A": "AB",
+		"B": "A",
+	}
+	iterations := 5
+	angle := 25.0
+
+	// Generate the L-system instructions
+	instructions := generateLSystem(axiom, rules, iterations)
+	points := drawLSystem(instructions, angle)
+
+	// Create a plot
+	p := plot.New()
+
+	// Create a line from all the points and add it to the plot
+	line, err := plotter.NewLine(points)
+	if err != nil {
+		panic(err)
+	}
+	p.Add(line)
+
+	// Save the plot to a PNG file
+	if err := p.Save(6*vg.Inch, 6*vg.Inch, "l_system.png"); err != nil {
+		panic(err)
+	}
+
+	fmt.Println("L-System plot saved as l_system.png")
+}
